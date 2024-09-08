@@ -3,10 +3,9 @@ name: autorun
 on:
   workflow_dispatch:
   schedule:
-    # 每小时执行一次，从 UTC 的22:00到23:00（北京时间第二天早上6:00到7:00）
-    - cron: '0 22-23 * * *'
-    # 每小时执行一次，从 UTC 的0:00到18:00（北京时间早上8:00到次日凌晨2:00）
-    - cron: '0 0-18 * * *'
+    # 5分钟运行一次
+    - cron: '0/5 * * * *'
+    
 
 jobs:
   ssh-and-run:
@@ -20,6 +19,15 @@ jobs:
       with:
         ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-    - name: Run script on remote server
-      run: ssh -o StrictHostKeyChecking=no ktech@s4.serv00.com "./run.sh"
-      # ktech@s4.serv00.com这里换成自己的服务器名字
+    - name: Check if service is running
+      id: check_service
+      run: |
+        if curl --head --silent --fail https://ziseyu.serv00.net/ > /dev/null; then #这里改成你的Web服务的地址
+          echo "service_status=running" >> $GITHUB_ENV
+        else
+          echo "service_status=not_running" >> $GITHUB_ENV
+        fi
+
+    - name: Run script on remote server if service is not running
+      if: env.service_status == 'not_running'
+      run: ssh -o StrictHostKeyChecking=no ziseyu@s6.serv00.com "/home/ziseyu/run.sh" #这里改成你的用户名@你的ssh服务器地址，以及/home/你的用户名/run.sh
